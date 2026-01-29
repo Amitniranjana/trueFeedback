@@ -20,7 +20,7 @@ export async function POST(request:NextRequest) {
       from: 'Acme <onboarding@resend.dev>',
       to:[email],
       subject: 'true feedback || verification code ',
-      react: EmailTemplate({ firstName: 'John' }),
+      react: EmailTemplate({ firstName: body.username }),
     });
 
     if (error) {

@@ -1,42 +1,89 @@
 import UserModel from "@/app/models/user";
-import { apiresponse } from "@/app/types/ApiResponse";
 import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
+import connect from "@/app/lib/dbConnect";
 
-export async function POST(request: NextRequest): Promise<apiresponse> {
-    const data = request.json();
+export async function POST(request: NextRequest) {
+  // 1. FIX: Await the database connection
+  await connect();
+
+  try {
+    const data = await request.json();
     const { email, username, password } = data;
-    const isUserAlreadyExistVerified = await UserModel.findOne({ username, isVerified: true });
-    if (isUserAlreadyExistVerified) {
-        return Response.json({
-            success: false,
-            message: "user already exist"
-        })
+
+    // Check if a verified user already exists by username
+    const existingUserVerifiedByUsername = await UserModel.findOne({
+      username,
+      isVerified: true,
+    });
+
+    if (existingUserVerifiedByUsername) {
+      return Response.json(
+        { success: false, message: "Username is already taken" },
+        { status: 400 }
+      );
     }
-    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const existingUserByEmail = await UserModel.findOne({ email });
     const token = Math.floor(100000 + Math.random() * 900000).toString();
     const expiryDate = new Date();
     expiryDate.setHours(expiryDate.getHours() + 1);
-    const userEmail = await UserModel.findOne({ email });
-    if (userEmail) {
-        const newUser = new UserModel({
-            username,
-            email,
-            password: hashedPassword,
-            createdAt: new Date(),
-            verifyCode: token,
-            verifyCodeExpiry: expiryDate,
-            isVerified: false,
-            isAcceptingMessage: false,
-            message: []
-        });
-        newUser.save();
-        
-       return Response.json({
-            success: true,
-            message: "user saved successfully"
-        })
-    }else{
 
+    if (existingUserByEmail) {
+      // 2. FIX: LOGIC for Existing User
+      if (existingUserByEmail.isVerified) {
+        return Response.json(
+          { success: false, message: "User already exists with this email" },
+          { status: 400 }
+        );
+      } else {
+        // Update the EXISTING user (Do not create a new one)
+        const hashedPassword = await bcrypt.hash(password, 10);
+        existingUserByEmail.password = hashedPassword;
+        existingUserByEmail.verifyCode = token;
+        existingUserByEmail.verifyCodeExpiry = expiryDate;
+
+        // 3. FIX: Await the save
+        await existingUserByEmail.save();
+      }
+    } else {
+      // 4. FIX: Create NEW user only if email does not exist
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const newUser = new UserModel({
+        username,
+        email,
+        password: hashedPassword,
+        createdAt: new Date(),
+        verifyCode: token,
+        verifyCodeExpiry: expiryDate,
+        isVerified: false,
+        isAcceptingMessage: false,
+        message: [],
+      });
+
+      // 3. FIX: Await the save
+      await newUser.save();
     }
+
+    return Response.json(
+      {
+        success: true,
+        message: "User registered successfully. Please verify your email.",
+      },
+      { status: 201 }
+    );
+
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("Signup Error:", errMsg);
+
+    // 5. FIX: Return a response if error occurs
+    return Response.json(
+      {
+        success: false,
+        message: "Error registering user",
+      },
+      { status: 500 }
+    );
+  }
 }

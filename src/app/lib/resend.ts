@@ -1,34 +1,29 @@
-import { NextRequest } from "next/server";
+
+import * as React from 'react';
 import { EmailTemplate } from "../emails/verificationEmail";
 import { Resend } from 'resend';
 
-
-
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export async function POST(request:NextRequest) {
+export async function sendVerificationMail(
+  userEmail: string,
+  firstName: string,
+  verifyCode: string
+) {
   try {
-    const body= await request.json();
-    const {email}=body;
-    if(!email){
-        return Response.json({
-            success:false,
-            message:"email is required to send the mail"
-        })
-    }
     const { data, error } = await resend.emails.send({
-      from: 'Acme <onboarding@resend.dev>',
-      to:[email],
-      subject: 'true feedback || verification code ',
-      react: EmailTemplate({ firstName: body.username }),
+      from: 'Acme <yamitniranjan@gmail.com>',
+      to: [userEmail],
+      subject: 'Email Verification',
+      react: React.createElement(EmailTemplate, { firstName, otp: verifyCode }),
     });
 
     if (error) {
-      return Response.json({ error }, { status: 500 });
+      return { success: false, error };
     }
 
-    return Response.json(data);
+    return { success: true, data };
   } catch (error) {
-    return Response.json({ error }, { status: 500 });
+    return { success: false, error };
   }
 }

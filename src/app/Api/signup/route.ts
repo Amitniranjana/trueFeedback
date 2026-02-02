@@ -1,7 +1,8 @@
 import UserModel from "@/app/models/user";
 import bcrypt from "bcryptjs";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import connect from "@/app/lib/dbConnect";
+import { sendVerificationMail } from "@/app/lib/resend";
 
 export async function POST(request: NextRequest) {
   // 1. FIX: Await the database connection
@@ -63,6 +64,14 @@ export async function POST(request: NextRequest) {
 
       // 3. FIX: Await the save
       await newUser.save();
+    }
+    const emailResponse= await sendVerificationMail(email , username , token);
+    if(!emailResponse.success){
+      console.error("in a trouble to send message")
+      return NextResponse.json({
+        success:false,
+        data:emailResponse,
+      })
     }
 
     return Response.json(

@@ -1,10 +1,12 @@
-import NextAuth from "next-auth"
+import  { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import UserModel from "@/app/models/user"
 import bcrypt from "bcryptjs"
- import connect from '@/app/lib/dbConnect';
+import connect from '@/app/lib/dbConnect';
+import { User } from '../../../models/user';
 
-export default NextAuthProvider(){
+
+export const nextOptions:NextAuthOptions={
 
     providers: [
         CredentialsProvider({
@@ -21,38 +23,66 @@ export default NextAuthProvider(){
             async authorize(credentials) {
                 //connect database
                 await connect();
-                try{
- // 2. Check if credentials exist
-                if (!credentials?.email || !credentials?.password) {
-                    throw new Error("Missing email or password");
-                }
-                const user = await UserModel.findOne({ email: credentials?.email });
-                if (!user) {
-                    throw new Error("provided email is wrong");
-                    // Return null if user data could not be retrieved
-                    return null
-                }
-                let hashedPassword = await bcrypt.hash(credentials?.password, 10);
+                try {
+                    // 2. Check if credentials exist
+                    if (!credentials?.email || !credentials?.password) {
+                        throw new Error("Missing email or password");
+                    }
+                    const user = await UserModel.findOne({ email: credentials?.email });
+                    if (!user) {
+                        throw new Error("provided email is wrong");
+                        // Return null if user data could not be retrieved
+                        return null
+                    }
+                    const hashedPassword = await bcrypt.hash(credentials?.password, 10);
 
-                let isPasswordCorrect = await bcrypt.compare(credentials?.password, hashedPassword);
-                if (!isPasswordCorrect) {
-                    throw new Error("password is incorrect")
-                    // Return null if user data could not be retrieved
-                    return null
-                }
-                return user;
-                // If no error and we have user data, return it
+                    const isPasswordCorrect = await bcrypt.compare(user.password, hashedPassword);
+                    if (!isPasswordCorrect) {
+                        throw new Error("password is incorrect")
+                        // Return null if user data could not be retrieved
+                        return null
+                    }
 
-                    return user;
-            
-                }catch(err:unknown){
-                    const errMsg=err instanceof Error?err.message:String(err);
+                    return {
+                        id:user?._id.toString(),
+                        email:user?.email
+                    };
+
+                } catch (err: unknown) {
+                    const errMsg = err instanceof Error ? err.message : String(err);
                     console.log(errMsg);
+                    return null
 
                 }
             }
         })
-    ]
+    ],
+    callbacks:{
+         async jwt({ token, user }) {
+        if(user){
+            token.email=user.email;
+            token.id=user.id;
+        }
+      return token
 
+    },
+async session({ session, token }) {
+    if(token){
+session.user.email=token.email;
+session.user.id=token.id ;
+    }
+
+      return session
+    },
+},
+
+    pages: {
+        signIn: "sign-in"
+    },
+
+    session: {
+        strategy: "jwt"
+    },
+    secret:process.env?.NEXTAUTH_SECRET
 
 }

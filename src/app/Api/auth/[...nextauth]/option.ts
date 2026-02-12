@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import UserModel from "@/app/models/user"
 import bcrypt from "bcryptjs"
 import connect from '@/app/lib/dbConnect';
+import { User } from '../../../models/user';
 
 
 export const nextOptions:NextAuthOptions={
@@ -35,28 +36,50 @@ export const nextOptions:NextAuthOptions={
                     }
                     const hashedPassword = await bcrypt.hash(credentials?.password, 10);
 
-                    const isPasswordCorrect = await bcrypt.compare(credentials?.password, hashedPassword);
+                    const isPasswordCorrect = await bcrypt.compare(user.password, hashedPassword);
                     if (!isPasswordCorrect) {
                         throw new Error("password is incorrect")
                         // Return null if user data could not be retrieved
                         return null
                     }
-                    return user;
-                    // If no error and we have user data, return it
 
-                    return user;
+                    return {
+                        id:user?._id.toString(),
+                        email:user?.email
+                    };
 
                 } catch (err: unknown) {
                     const errMsg = err instanceof Error ? err.message : String(err);
                     console.log(errMsg);
+                    return null
 
                 }
             }
         })
     ],
+    callbacks:{
+         async jwt({ token, user }) {
+        if(user){
+            token.email=user.email;
+            token.id=user.id;
+        }
+      return token
+
+    },
+async session({ session, token }) {
+    if(token){
+session.user.email=token.email;
+session.user.id=token.id ;
+    }
+
+      return session
+    },
+},
+
     pages: {
         signIn: "sign-in"
     },
+
     session: {
         strategy: "jwt"
     },

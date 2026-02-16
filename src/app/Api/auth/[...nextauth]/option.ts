@@ -3,7 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import UserModel from "@/app/models/user"
 import bcrypt from "bcryptjs"
 import connect from '@/app/lib/dbConnect';
-import { User } from '../../../models/user';
+
 
 
 export const nextOptions:NextAuthOptions={
@@ -35,7 +35,10 @@ export const nextOptions:NextAuthOptions={
                         return null
                     }
                     const hashedPassword = await bcrypt.hash(credentials?.password, 10);
-
+if(!user.password){
+    throw new Error("first sign up")
+    return null;
+}
                     const isPasswordCorrect = await bcrypt.compare(user.password, hashedPassword);
                     if (!isPasswordCorrect) {
                         throw new Error("password is incorrect")
@@ -68,8 +71,8 @@ export const nextOptions:NextAuthOptions={
     },
 async session({ session, token }) {
     if(token){
-session.user.email=token.email;
-session.user.id=token.id ;
+session.user.email=token.email as string;
+session.user.id=token.id as string;
     }
 
       return session
